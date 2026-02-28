@@ -6,6 +6,11 @@ import os
 import sys
 import shlex
 
+try:
+    import readline
+except ImportError:
+    pass
+
 def send_msg(sock, msg_dict):
     data = json.dumps(msg_dict).encode('utf-8')
     sock.sendall(struct.pack(">I", len(data)) + data)
@@ -37,28 +42,42 @@ def handle_upload(sock, local_path, remote_path):
     if not os.path.isfile(local_path):
         print("Local file not found.")
         return
+        
+    filesize = os.path.getsize(local_path)
     resp = send_and_recv(sock, {"cmd": "upload_start", "args": [remote_path]})
     if not resp or resp.get("status") != "ok":
         print("Error:", resp.get("error") if resp else "Connection lost")
         return
     
+    uploaded = 0
     try:
         with open(local_path, "rb") as f:
             while True:
                 chunk = f.read(1024 * 1024)
                 if not chunk:
                     break
+                
                 b64chunk = base64.b64encode(chunk).decode('ascii')
                 resp = send_and_recv(sock, {"cmd": "upload_chunk", "data": b64chunk})
                 if not resp or resp.get("status") != "ok":
-                    print("Error uploading chunk:", resp.get("error") if resp else "Connection lost")
+                    print("\nError uploading chunk:", resp.get("error") if resp else "Connection lost")
                     return
+                
+                uploaded += len(chunk)
+                if filesize > 0:
+                    percent = min(100, int((uploaded / filesize) * 100))
+                    bar = '#' * (percent // 2) + '-' * (50 - (percent // 2))
+                    sys.stdout.write(f"\r[{bar}] {percent}% ({uploaded}/{filesize} bytes) ")
+                    sys.stdout.flush()
+                else:
+                    sys.stdout.write(f"\rUploaded {uploaded} bytes ")
+                    sys.stdout.flush()
                     
         resp = send_and_recv(sock, {"cmd": "upload_end"})
         if resp:
-            print(resp.get("output", "Done"))
+            print("\n" + resp.get("output", "Done"))
     except Exception as e:
-        print(f"Failed to read local file: {e}")
+        print(f"\nFailed to read local file: {e}")
 
 def handle_download(sock, remote_path, local_path):
     resp = send_and_recv(sock, {"cmd": "download_req", "args": [remote_path]})
@@ -66,23 +85,36 @@ def handle_download(sock, remote_path, local_path):
         print("Error:", resp.get("error") if resp else "Connection lost")
         return
         
+    filesize = resp.get("filesize", 0)
+    downloaded = 0
     try:
         with open(local_path, "wb") as f:
             while True:
                 resp = send_and_recv(sock, {"cmd": "download_chunk"})
                 if not resp:
-                    print("Connection lost")
+                    print("\nConnection lost")
                     return
                 if resp.get("status") == "done":
                     break
                 elif resp.get("status") != "ok":
-                    print("Error downloading chunk:", resp.get("error"))
+                    print("\nError downloading chunk:", resp.get("error"))
                     return
+                
                 chunk = base64.b64decode(resp.get("data"))
                 f.write(chunk)
-        print("Download complete.")
+                downloaded += len(chunk)
+                if filesize > 0:
+                    percent = min(100, int((downloaded / filesize) * 100))
+                    bar = '#' * (percent // 2) + '-' * (50 - (percent // 2))
+                    sys.stdout.write(f"\r[{bar}] {percent}% ({downloaded}/{filesize} bytes) ")
+                    sys.stdout.flush()
+                else:
+                    sys.stdout.write(f"\rDownloaded {downloaded} bytes ")
+                    sys.stdout.flush()
+                    
+        print("\nDownload complete.")
     except Exception as e:
-        print("Failed to save local file:", str(e))
+        print("\nFailed to save local file:", str(e))
 
 def main():
     host = "127.0.0.1"

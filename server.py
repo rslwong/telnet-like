@@ -132,7 +132,8 @@ class ClientHandler(threading.Thread):
                 target = self.get_abs_path(args[0])
                 if os.path.isfile(target):
                     self.download_target = open(target, "rb")
-                    return {"status": "ok"}
+                    size = os.path.getsize(target)
+                    return {"status": "ok", "filesize": size}
                 else:
                     return {"status": "error", "error": "File not found"}
             elif cmd == "download_chunk":
