@@ -49,4 +49,9 @@ Once connected, you will see a `remote>` prompt. You can use any of the followin
   - On Windows: `exec dir`
 - `upload <local_path> <remote_path>`: Upload a local file to the remote server.
 - `download <remote_path> <local_path>`: Download a remote file to your local machine.
+- `cpwd`: Print the working directory of the local client.
+- `cls [directory]`: List files and folders in the current (or specified) local directory.
+- `ccd <directory>`: Change the local client's working directory.
+- `ccat <file>`: Read and display the contents of a text file locally.
+- `cexec <command>`: Execute a system command directly on the local shell and print its stdout and stderr.
 - `exit` or `quit`: Disconnect gracefully and close the client.

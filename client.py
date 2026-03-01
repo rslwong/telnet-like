@@ -5,6 +5,7 @@ import base64
 import os
 import sys
 import shlex
+import subprocess
 
 try:
     import readline
@@ -148,6 +149,10 @@ def main():
             cmd = "exec"
             command_str = user_input[5:].strip()
             args = [command_str]
+        elif user_input.startswith("cexec "):
+            cmd = "cexec"
+            command_str = user_input[6:].strip()
+            args = [command_str]
         else:
             try:
                 if os.name == 'nt':
@@ -182,6 +187,71 @@ def main():
             handle_download(sock, args[0], args[1])
             continue
             
+        if cmd == "cpwd":
+            print(os.getcwd())
+            continue
+            
+        if cmd == "ccd":
+            if not args:
+                print("ccd requires a directory")
+            else:
+                try:
+                    os.chdir(args[0])
+                except Exception as e:
+                    print(f"Error: {e}")
+            continue
+            
+        if cmd == "cls":
+            target = os.getcwd()
+            if args:
+                target = args[0]
+            if os.path.isdir(target):
+                items = os.listdir(target)
+                res = []
+                for item in items:
+                    item_path = os.path.join(target, item)
+                    if os.path.isdir(item_path):
+                        res.append(f"{item}/")
+                    else:
+                        res.append(item)
+                print("\n".join(res))
+            else:
+                print("Directory not found")
+            continue
+            
+        if cmd == "ccat":
+            if not args:
+                print("ccat requires a file")
+            else:
+                target = args[0]
+                if os.path.isfile(target):
+                    try:
+                        with open(target, "r", encoding="utf-8", errors="replace") as f:
+                            content = f.read()
+                            print(content, end="")
+                            if not content.endswith("\n"):
+                                print()
+                    except Exception as e:
+                        print(f"Error: {e}")
+                else:
+                    print("File not found")
+            continue
+            
+        if cmd == "cexec":
+            if not args:
+                print("cexec requires a command")
+            else:
+                command = args[0] if len(args) == 1 else " ".join(args)
+                try:
+                    proc = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
+                    stdout, _ = proc.communicate()
+                    print(stdout, end="")
+                    if not stdout.endswith("\n"):
+                        print()
+                except Exception as e:
+                    print(f"Error: {e}")
+            continue
+            
         if cmd in ("ls", "cat", "cd", "pwd", "exec"):
             resp = send_and_recv(sock, {"cmd": cmd, "args": args})
             if resp:
@@ -195,7 +265,7 @@ def main():
                 print("Connection lost.")
                 break
         else:
-            print("Client supported commands: ls, cat, cd, pwd, exec <command>, upload <local> <remote>, download <remote> <local>, exit")
+            print("Client supported commands: ls, cat, cd, pwd, exec <command>, upload <local> <remote>, download <remote> <local>, cpwd, cls, ccd, ccat, cexec <command>, exit")
             
     sock.close()
 
