@@ -105,6 +105,28 @@ class ClientHandler(threading.Thread):
                         return {"status": "ok", "output": f.read()}
                 else:
                     return {"status": "error", "error": "File not found"}
+            elif cmd == "complete":
+                prefix = args[0] if args else ""
+                norm_prefix = prefix.replace('\\', '/')
+                dir_part = os.path.dirname(norm_prefix)
+                base_prefix = os.path.basename(norm_prefix)
+                
+                target_dir = self.get_abs_path(dir_part or ".")
+                
+                matches = []
+                if os.path.isdir(target_dir):
+                    try:
+                        for item in os.listdir(target_dir):
+                            if item.startswith(base_prefix):
+                                item_path = os.path.join(target_dir, item)
+                                match = f"{dir_part}/{item}" if dir_part else item
+                                if os.path.isdir(item_path):
+                                    matches.append(match + "/")
+                                else:
+                                    matches.append(match)
+                    except Exception:
+                        pass
+                return {"status": "ok", "matches": sorted(matches)}
             elif cmd == "exec":
                 if not args:
                     return {"status": "error", "error": "exec requires a command"}

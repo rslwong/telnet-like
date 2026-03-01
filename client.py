@@ -10,7 +10,7 @@ import subprocess
 try:
     import readline
 except ImportError:
-    pass
+    readline = None
 
 def send_msg(sock, msg_dict):
     data = json.dumps(msg_dict).encode('utf-8')
@@ -80,6 +80,61 @@ def handle_upload(sock, local_path, remote_path):
     except Exception as e:
         print(f"\nFailed to read local file: {e}")
 
+def make_completer(sock):
+    def completer(text, state):
+        if state == 0:
+            line = readline.get_line_buffer()
+            if " " not in line:
+                cmds = ["ls", "cat", "cd", "pwd", "exec", "upload", "download", "exit", "quit", "cpwd", "ccd", "cls", "ccat", "cexec"]
+                completer.matches = sorted([c + " " for c in cmds if c.startswith(text)])
+            else:
+                parts = line.split(maxsplit=1)
+                cmd = parts[0]
+                
+                words = line.split()
+                if cmd in ["cpwd", "ccd", "cls", "ccat"]:
+                    is_local = True
+                elif cmd == "upload":
+                    is_local = (len(words) == 1 and line.endswith(" ")) or (len(words) == 2 and not line.endswith(" "))
+                elif cmd == "download":
+                    is_local = not ((len(words) == 1 and line.endswith(" ")) or (len(words) == 2 and not line.endswith(" ")))
+                else:
+                    is_local = False
+                    
+                if is_local:
+                    norm_prefix = text.replace('\\', '/')
+                    dir_part = os.path.dirname(norm_prefix)
+                    base_prefix = os.path.basename(norm_prefix)
+                    target_dir = dir_part or "."
+                    
+                    completer.matches = []
+                    if os.path.isdir(target_dir):
+                        try:
+                            for item in os.listdir(target_dir):
+                                if item.startswith(base_prefix):
+                                    item_path = os.path.join(target_dir, item)
+                                    match = f"{dir_part}/{item}" if dir_part else item
+                                    if os.path.isdir(item_path):
+                                        completer.matches.append(match + "/")
+                                    else:
+                                        completer.matches.append(match)
+                        except Exception:
+                            pass
+                    completer.matches.sort()
+                else:
+                    resp = send_and_recv(sock, {"cmd": "complete", "args": [text]})
+                    if resp and resp.get("status") == "ok":
+                        completer.matches = resp.get("matches", [])
+                    else:
+                        completer.matches = []
+                        
+        if state < len(completer.matches):
+            return completer.matches[state]
+        return None
+
+    completer.matches = []
+    return completer
+
 def handle_download(sock, remote_path, local_path):
     resp = send_and_recv(sock, {"cmd": "download_req", "args": [remote_path]})
     if not resp or resp.get("status") != "ok":
@@ -134,6 +189,23 @@ def main():
         
     print(f"Connected to {host}:{port}")
     
+    if readline is not None:
+        try:
+            delims = readline.get_completer_delims()
+            delims = delims.replace('/', '').replace('\\', '')
+            readline.set_completer_delims(delims)
+            readline.set_completer(make_completer(sock))
+            if sys.platform == 'darwin':
+                readline.parse_and_bind("bind ^I rl_complete")
+            else:
+                readline.parse_and_bind("tab: complete")
+        except Exception as e:
+            print(f"Warning: Tab completion setup failed: {e}")
+    else:
+        print("Note: 'readline' module not found. Tab completion will not be available.")
+        if os.name == 'nt':
+            print("To enable tab completion on Windows, run: pip install pyreadline3")
+            
     while True:
         try:
             user_input = input("remote> ")
