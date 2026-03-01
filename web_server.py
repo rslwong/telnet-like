@@ -90,6 +90,14 @@ class WebClientHandler:
                 return {"type": "output", "data": stdout.replace('\n', '\r\n') + "\r\n"}
             elif cmd == "clear":
                 return {"type": "output", "data": "\033[2J\033[H"}
+            elif cmd == "upload":
+                if not args:
+                    return {"type": "output", "data": "upload requires a path\r\n"}
+                return {"type": "trigger_upload", "path": args[0]}
+            elif cmd == "download":
+                if not args:
+                    return {"type": "output", "data": "download requires a file\r\n"}
+                return {"type": "trigger_download", "path": args[0], "local_name": args[1] if len(args) > 1 else ""}
             elif cmd == "complete":
                 prefix = args[0] if args else ""
                 norm_prefix = prefix.replace('\\', '/')
@@ -173,26 +181,19 @@ async def ws_handler(websocket, *args, **kwargs):
                     line = data.get("command", "")
                     prompt_needed = True
                     
-                    if line.startswith("upload "):
-                        # Handled entirely by frontend logic
-                        pass 
-                    elif line.startswith("download "):
-                        # Handled entirely by frontend logic
-                        pass
-                    else:
-                        output_dict = await client.handle_cmd(line)
-                        if output_dict:
-                            if output_dict.get("type") == "completion":
-                                await websocket.send(json.dumps(output_dict))
-                                prompt_needed = False
+                    output_dict = await client.handle_cmd(line)
+                    if output_dict:
+                        if output_dict.get("type") in ("completion", "trigger_upload", "trigger_download"):
+                            await websocket.send(json.dumps(output_dict))
+                            prompt_needed = False
+                        else:
+                            out_data = output_dict.get("data", "")
+                            prompt = f"\r\n\033[1;32mweb-remote\033[0m:\033[1;34m{client.cwd}\033[0m$ "
+                            if out_data == "\033[2J\033[H":
+                                await websocket.send(json.dumps({"type": "output", "data": out_data + prompt.lstrip("\r\n")}))
                             else:
-                                out_data = output_dict.get("data", "")
-                                prompt = f"\r\n\033[1;32mweb-remote\033[0m:\033[1;34m{client.cwd}\033[0m$ "
-                                if out_data == "\033[2J\033[H":
-                                    await websocket.send(json.dumps({"type": "output", "data": out_data + prompt.lstrip("\r\n")}))
-                                else:
-                                    await websocket.send(json.dumps({"type": "output", "data": out_data + prompt}))
-                                prompt_needed = False
+                                await websocket.send(json.dumps({"type": "output", "data": out_data + prompt}))
+                            prompt_needed = False
                         
                     if prompt_needed:
                         prompt = f"\r\n\033[1;32mweb-remote\033[0m:\033[1;34m{client.cwd}\033[0m$ "

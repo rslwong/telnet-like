@@ -93,6 +93,12 @@
                         rpcResolve = null;
                         rpcReject = null;
                     }
+                } else if (msg.type === "trigger_upload") {
+                    await handleUpload(msg.path);
+                    ws.send(JSON.stringify({ type: 'cmd', command: '' }));
+                } else if (msg.type === "trigger_download") {
+                    await handleDownload(msg.path, msg.local_name);
+                    ws.send(JSON.stringify({ type: 'cmd', command: '' }));
                 }
             } catch (e) {
                 // Not JSON, assume raw 
@@ -257,27 +263,7 @@
                     history.push(line);
                     historyIndex = history.length;
 
-                    if (line.startsWith("upload ")) {
-                        const parts = line.split(" ");
-                        if (parts.length < 2) {
-                            term.write('Usage: upload <remote_path>\r\n');
-                            ws.send(JSON.stringify({ type: 'cmd', command: '' })); // trigger prompt
-                        } else {
-                            await handleUpload(parts[1]);
-                            ws.send(JSON.stringify({ type: 'cmd', command: '' })); // trigger prompt
-                        }
-                    } else if (line.startsWith("download ")) {
-                        const parts = line.split(" ");
-                        if (parts.length < 2) {
-                            term.write('Usage: download <remote_file> [local_name]\r\n');
-                            ws.send(JSON.stringify({ type: 'cmd', command: '' })); // trigger prompt
-                        } else {
-                            await handleDownload(parts[1], parts[2]);
-                            ws.send(JSON.stringify({ type: 'cmd', command: '' })); // trigger prompt
-                        }
-                    } else {
-                        ws.send(JSON.stringify({ type: 'cmd', command: currentLine }));
-                    }
+                    ws.send(JSON.stringify({ type: 'cmd', command: currentLine }));
                 } else {
                     ws.send(JSON.stringify({ type: 'cmd', command: currentLine }));
                 }
