@@ -6,6 +6,7 @@
     <!-- xterm.js -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
     <style>
         body {
             background-color: #0b0b0b;
@@ -18,6 +19,7 @@
             align-items: center;
             height: 100vh;
             box-sizing: border-box;
+            overflow: hidden;
         }
 
         h1 {
@@ -28,12 +30,14 @@
 
         #terminal-container {
             width: 80%;
-            height: 70%;
+            flex: 1;
+            min-height: 0;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
             padding: 15px;
             border-radius: 8px;
             background-color: #1e1e1e;
             border: 1px solid #333;
+            margin-bottom: 20px;
         }
     </style>
 </head>
@@ -51,7 +55,25 @@
             fontSize: 14
         });
 
-        term.open(document.getElementById('terminal-container'));
+        const fitAddon = new FitAddon.FitAddon();
+        term.loadAddon(fitAddon);
+
+        const container = document.getElementById('terminal-container');
+        term.open(container);
+
+        // Initial fit
+        fitAddon.fit();
+
+        // Re-fit on window resize
+        window.addEventListener('resize', () => {
+            fitAddon.fit();
+        });
+
+        // Also observe the container itself for size changes
+        const resizeObserver = new ResizeObserver(() => {
+            fitAddon.fit();
+        });
+        resizeObserver.observe(container);
         term.writeln('Welcome to the Experimental Web Terminal!');
         term.writeln('Connecting to server...');
 
