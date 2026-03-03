@@ -329,10 +329,13 @@
                     ws.send(JSON.stringify({ type: 'cmd', command: `complete ${prefix}` }));
                 }
             } else {
-                // Filter out non-printable ansi for normal typing
-                if (e >= String.fromCharCode(0x20) && e <= String.fromCharCode(0x7E)) {
-                    currentLine += e;
-                    term.write(e);
+                // Allow printable characters including Unicode (Chinese, etc.)
+                for (const ch of e) {
+                    const code = ch.codePointAt(0);
+                    if (code >= 0x20 && code !== 0x7F) {
+                        currentLine += ch;
+                        term.write(ch);
+                    }
                 }
             }
         });
